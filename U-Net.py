@@ -250,7 +250,7 @@ def train_uNet(X_train_cv, Y_train_cv, X_dev, Y_dev, parameters, batch_size, tra
                         verbose = 2,
                         validation_data = (X_dev, Y_dev),
                         validation_steps = int(X_train_cv.shape[0]/batch_size),
-                        callbacks = [EarlyStopping('val_loss', patience=patience, mode="min"),
+                        callbacks = [EarlyStopping('val_loss', patience=parameters['patience'], mode="min"),
                                      ModelCheckpoint(file_path, save_best_only=True)])
 
     return model
@@ -347,7 +347,7 @@ for learning_rate in learning_rates:
     if pre_proc['vertical_flip']:
         aug = '{}_{}={vertical_flip}'.format(aug, 'v-flip', **pre_proc)
 
-    parameters = {'learning_rate':learning_rate, 'dropout_rate':dropout_rate, 'aug':aug, 'decay':decay}
+    parameters = {'learning_rate':learning_rate, 'dropout_rate':dropout_rate, 'aug':aug, 'decay':decay, 'patience':patience}
     directory = 'model_5/{learning_rate}_{dropout_rate}/{aug}'.format(**parameters)
     metrics = {'train_loss': 0, 'dev_loss': 0, 'avg_dev_loss': 0, 'IoU': 0, 'IoU_log': 0, 'K': K,
                'hdf5': '.hdf5'}
