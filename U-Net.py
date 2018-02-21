@@ -29,8 +29,7 @@ Y_train = np.load('data/Y_128.npy')
 X_test = np.load('data/test_128.npy')
 
 np.random.seed(seed = 71)
-seed = 71
-epochs = 1
+epochs = 2
 learning_rate = 1e-3
 learning_rates = [1e-3]
 decay = 5e-5
@@ -114,14 +113,6 @@ def my_iou_metric(label, pred):
     metric_value = iou_metric_batch(label, pred)
 
     return metric_value
-
-
-def get_callbacks(filepath, patience):
-
-   early_stop = EarlyStopping('val_loss', patience=patience, mode="min")
-   model_save = ModelCheckpoint(filepath, save_best_only=True)
-
-   return [early_stop, model_save]
 
 #########################################################################################################
 
@@ -245,8 +236,7 @@ def uNet_Model(input_shape = (128, 128, 3), dropout_rate = dropout_rate):
 #####################################################################################################
 
 
-def train_uNet(X_train_cv, Y_train_cv, X_dev, Y_dev, parameters, batch_size, callbacks,
-                     train_generator):
+def train_uNet(X_train_cv, Y_train_cv, X_dev, Y_dev, parameters, batch_size, train_generator, file_path):
 
     # Train model using Adam optimizer and early stopping
     model = uNet_Model(input_shape=(128, 128, 3), dropout_rate = parameters['dropout_rate'])
@@ -260,15 +250,15 @@ def train_uNet(X_train_cv, Y_train_cv, X_dev, Y_dev, parameters, batch_size, cal
                         verbose = 2,
                         validation_data = (X_dev, Y_dev),
                         validation_steps = int(X_train_cv.shape[0]/batch_size),
-                        callbacks = callbacks)
+                        callbacks = [EarlyStopping('val_loss', patience=patience, mode="min"),
+                                     ModelCheckpoint(file_path, save_best_only=True)])
 
     return model
 
 
-def get_folds(X_train, Y_train, K, seed):
+def get_folds(X_train, Y_train, K):
 
     # Shuffles data then returns K folds of X,Y-train, X,Y-dev
-    np.random.seed(seed = seed)
     folds = []
     m = X_train.shape[0]
     permutation = list(np.random.permutation(m))
@@ -288,7 +278,7 @@ def get_folds(X_train, Y_train, K, seed):
     return folds
 
 
-def list_parameters(j, parameters, directory):
+def get_file_path(j, parameters, directory):
 
     print('\nFold:\t{}\nlearning_rate:\t{learning_rate}\ndropout_rate:\t{dropout_rate}\naugmentation:\t{aug}'.format(str(j), **parameters))
     if not os.path.exists(directory):
@@ -298,16 +288,16 @@ def list_parameters(j, parameters, directory):
     return file_path
 
 
-def list_metrics(j, metrics, file_path, directory):
+def rename_weight_path(j, metrics, file_path, directory):
 
     print('\nFold:\t{}\nTrain Loss:\t{train_loss:.4}\nDev Loss:\t{dev_loss:.4}\nMean IoU:\t{IoU:.4}\n'.format(str(j), **metrics))
-    new_weight_name = '{}_{}_{dev_loss:.4}_{IoU:.4}{hdf5}'.format('/weights', str(j), **metrics)
-    os.rename(file_path, directory + new_weight_name)
+    new_weight_path = '{}_{}_{dev_loss:.4}_{IoU:.4}{hdf5}'.format('/weights', str(j), **metrics)
+    os.rename(file_path, directory + new_weight_path)
 
     return
 
 
-def print_final(parameters, metrics, directory):
+def print_final_metrics(parameters, metrics, directory):
 
     print('\n\nlearning_rate: {learning_rate}\ndropout_rate: {dropout_rate}\naugmentation: {aug}'.format(**parameters))
     print('avg_dev_loss:\t{avg_dev_loss}\nmean_IoU:\t{IoU_log}\n\n\n'.format(**metrics))
@@ -365,27 +355,25 @@ for learning_rate in learning_rates:
     # Create image and mask data generators for preprocessing
     image_datagen = ImageDataGenerator(**pre_proc)
     mask_datagen = ImageDataGenerator(**pre_proc)
-    image_datagen.fit(X_train, augment = True, seed = seed)
-    mask_datagen.fit(Y_train, augment = True, seed = seed)
+    image_datagen.fit(X_train, augment = True)
+    mask_datagen.fit(Y_train, augment = True)
     image_generator = image_datagen.flow(X_train,
-                                         seed = seed,
                                          batch_size = batch_size)
     mask_generator = mask_datagen.flow(Y_train,
-                                       seed = seed,
                                        batch_size = batch_size)
     train_generator = zip(image_generator, mask_generator)
     
     # Create folds and train
-    folds = get_folds(X_train, Y_train, K, seed)
+    folds = get_folds(X_train, Y_train, K)
     for j in range(K):
         X_train_cv = folds[j][0]
         Y_train_cv = folds[j][1]
         X_dev = folds[j][2]
         Y_dev = folds[j][3]
-        file_path = list_parameters(j, parameters, directory)
-        callbacks = get_callbacks(filepath = file_path, patience = patience)
+        file_path = get_file_path(j, parameters, directory)
         model = train_uNet(X_train_cv, Y_train_cv, X_dev, Y_dev, parameters, batch_size,
-                           callbacks, train_generator)
+                           train_generator, file_path)
         metrics = get_metrics(model, X_train_cv, Y_train_cv, X_dev, Y_dev, file_path, metrics)
-        list_metrics(j, metrics, file_path, directory)
-    print_final(parameters, metrics, directory)
+        rename_weight_path(j, metrics, file_path, directory)
+    print_final_metrics(parameters, metrics, directory)
+
