@@ -29,7 +29,7 @@ Y_train = np.load('data/Y_128.npy')
 X_test = np.load('data/test_128.npy')
 
 np.random.seed(seed = 71)
-epochs = 2
+epochs = 500
 learning_rate = 1e-3
 learning_rates = [1e-3]
 decay = 5e-5
@@ -42,7 +42,7 @@ pre_proc = dict(horizontal_flip = True,
                 width_shift_range = 0.1,
                 height_shift_range = 0.1,
                 channel_shift_range= 0.0,
-                zoom_range = 0.25,
+                zoom_range = 0.0,
                 rotation_range = 0.0)
 
 ####################################################################
@@ -206,7 +206,7 @@ def uNet_Model(input_shape = (128, 128, 3), dropout_rate = dropout_rate):
     # Bottom block
     X = identity_block(X5, filters = [256, 256, 1024], dropout_rate = dropout_rate) # 4x4
     X = Add()([X, X5]) # 4x4
-    4
+    
     # Deconvolution block 1
     X = deconvolution_block(X, filters = [128, 128, 512], dropout_rate = dropout_rate) # 8x8
     X = Add()([X, X4])  # 8x8
@@ -335,17 +335,17 @@ def get_metrics(model, X_train_cv, Y_train_cv, X_dev, Y_dev, file_path, metrics)
 
 for learning_rate in learning_rates:
 
-    aug = '_'
+    aug = ''
     if pre_proc['width_shift_range'] != 0.0:
-        aug = '{}_{}={width_shift_range}'.format(aug, 'shift', **pre_proc)
+        aug += '_{}={width_shift_range}'.format(aug, 'shift', **pre_proc)
     if pre_proc['zoom_range'] != 0.0:
-        aug = '{}_{}={zoom_range}'.format(aug, 'zoom', **pre_proc)
+        aug += '_{}={zoom_range}'.format(aug, 'zoom', **pre_proc)
     if pre_proc['rotation_range'] != 0.0:
-        aug = '{}_{}={rotation_range}'.format(aug, 'rotation', **pre_proc)
+        aug += '_{}={rotation_range}'.format(aug, 'rotation', **pre_proc)
     if pre_proc['horizontal_flip']:
-        aug = '{}_{}={horizontal_flip}'.format(aug, 'h-flip', **pre_proc)
+        aug += '_{}={horizontal_flip}'.format(aug, 'h-flip', **pre_proc)
     if pre_proc['vertical_flip']:
-        aug = '{}_{}={vertical_flip}'.format(aug, 'v-flip', **pre_proc)
+        aug += '_{}={vertical_flip}'.format(aug, 'v-flip', **pre_proc)
 
     parameters = {'learning_rate':learning_rate, 'dropout_rate':dropout_rate, 'aug':aug, 'decay':decay, 'patience':patience}
     directory = 'model_5/{learning_rate}_{dropout_rate}/{aug}'.format(**parameters)
